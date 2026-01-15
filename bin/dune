@@ -1,0 +1,4 @@
+(executable
+ (name main)
+ (public_name wt)
+ (libraries wt_lib))
