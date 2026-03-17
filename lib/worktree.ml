@@ -256,6 +256,34 @@ let delete_both_command branch_name =
         exit 1
       end
 
+let repo_command repo_name =
+  let base_dir = Utils.get_wt_base_dir () in
+  if not (Sys.file_exists base_dir) then begin
+    Printf.eprintf "No repo '%s' found.\n" repo_name;
+    exit 1
+  end;
+  let repos = Utils.list_dir base_dir
+    |> List.filter (Utils.is_repo_dir base_dir) in
+  (* Exact match first, then substring match *)
+  let matches =
+    let exact = List.filter (fun r -> r = repo_name) repos in
+    if exact <> [] then exact
+    else List.filter (fun r ->
+      try
+        let _ = Str.search_forward (Str.regexp_string_case_fold repo_name) r 0 in
+        true
+      with Not_found -> false
+    ) repos
+  in
+  match matches with
+  | [] ->
+      Printf.eprintf "No repo '%s' found.\n" repo_name;
+      exit 1
+  | repos ->
+      List.iter (fun repo ->
+        Printf.printf "%s\n" (Filename.concat base_dir repo)
+      ) (List.sort String.compare repos)
+
 let list_command () =
   let base_dir = Utils.get_wt_base_dir () in
   if not (Sys.file_exists base_dir) then begin

@@ -111,6 +111,7 @@ echo "Usage:"
 echo "  wt b <branch>       Create/navigate to branch worktree"
 echo "  wt d <branch>       Delete worktree (keeps branch)"
 echo "  wt db <branch>      Delete both worktree and branch"
+echo "  wt repo <name>      Print absolute path of a repo"
 echo "  wt list             List all worktrees"
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo "  wtb <branch>       Create and cd into worktree"

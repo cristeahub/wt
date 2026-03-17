@@ -8,6 +8,7 @@ let usage () =
   Printf.printf "  wt b <branch_name>   Create branch and worktree, or navigate to existing\n";
   Printf.printf "  wt d <branch_name>   Delete worktree (keeps branch)\n";
   Printf.printf "  wt db <branch_name>  Delete both worktree and branch\n";
+  Printf.printf "  wt repo <name>       Print absolute path of a repo (substring match)\n";
   Printf.printf "  wt list              List all worktrees\n";
   Printf.printf "\n";
   Printf.printf "Docker commands (run from within a worktree):\n";
@@ -181,6 +182,11 @@ let () =
   | ["b"; branch_name] -> Wt_lib.Worktree.branch_command branch_name
   | ["d"; branch_name] -> Wt_lib.Worktree.delete_command branch_name
   | ["db"; branch_name] -> Wt_lib.Worktree.delete_both_command branch_name
+  | ["repo"; name] -> Wt_lib.Worktree.repo_command name
+  | ["repo"] ->
+      Printf.eprintf "Error: Missing repo name\n";
+      Printf.eprintf "Usage: wt repo <name>\n";
+      exit 1
   | ["list"] -> Wt_lib.Worktree.list_command ()
   | ["b"] ->
       Printf.eprintf "Error: Missing branch name\n";
