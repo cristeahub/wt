@@ -30,7 +30,7 @@ This is an OCaml CLI tool for managing git worktrees. It stores worktrees in `~/
 ### Key Design Decisions
 
 - Uses `Unix.open_process_in` for git command execution (no external process libraries)
-- Worktree paths use percent-encoding (`%2F`) for `/` in branch names to avoid collisions
+- Worktree paths use underscore escaping (`/` → `_`, `_` → `__`) for branch names to avoid collisions
 - `wt b <branch>` outputs the worktree path on the last line, enabling the shell function `wtb()` to auto-cd
 - Can navigate to existing worktrees from any directory, but creating new ones requires being in a git repo
 - `wt d` only removes the worktree (non-destructive), `wt db` removes both worktree and branch

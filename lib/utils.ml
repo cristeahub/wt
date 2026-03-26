@@ -5,14 +5,14 @@ let shell_escape s =
   "'" ^ String.concat "'\\''" (String.split_on_char '\'' s) ^ "'"
 
 (* Encode a branch name for safe filesystem use.
-   Uses percent-encoding for '/' and '%' to avoid collisions
+   Uses underscore escaping: '_' -> '__', '/' -> '_'
    (e.g. branches "feature/auth" and "feature_auth" map to distinct paths). *)
 let safe_branch_name branch_name =
   let buf = Buffer.create (String.length branch_name) in
   String.iter (fun c ->
     match c with
-    | '/' -> Buffer.add_string buf "%2F"
-    | '%' -> Buffer.add_string buf "%25"
+    | '_' -> Buffer.add_string buf "__"
+    | '/' -> Buffer.add_char buf '_'
     | _ -> Buffer.add_char buf c
   ) branch_name;
   Buffer.contents buf
@@ -87,19 +87,19 @@ let is_repo_dir base_dir name =
   (not (List.mem name internal_dirs)) &&
   Sys.is_directory (Filename.concat base_dir name)
 
-(* Decode a percent-encoded branch name back to the original.
-   Reverses safe_branch_name: %2F -> /, %25 -> % *)
+(* Decode an underscore-escaped branch name back to the original.
+   Reverses safe_branch_name: '__' -> '_', single '_' -> '/' *)
 let decode_branch_name encoded =
   let len = String.length encoded in
   let buf = Buffer.create len in
   let i = ref 0 in
   while !i < len do
-    if !i + 2 < len && encoded.[!i] = '%' then begin
-      let hex = String.sub encoded (!i + 1) 2 in
-      match hex with
-      | "2F" | "2f" -> Buffer.add_char buf '/'; i := !i + 3
-      | "25" -> Buffer.add_char buf '%'; i := !i + 3
-      | _ -> Buffer.add_char buf encoded.[!i]; i := !i + 1
+    if !i + 1 < len && encoded.[!i] = '_' && encoded.[!i + 1] = '_' then begin
+      Buffer.add_char buf '_';
+      i := !i + 2
+    end else if encoded.[!i] = '_' then begin
+      Buffer.add_char buf '/';
+      i := !i + 1
     end else begin
       Buffer.add_char buf encoded.[!i];
       i := !i + 1

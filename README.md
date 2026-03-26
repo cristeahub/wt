@@ -177,7 +177,7 @@ Each worktree gets an isolated Claude session. The token is saved to `~/.local/s
 ├── token                  # Claude OAuth token (mode 0600)
 └── <repo>/
     ├── feature-x/         # worktree directories
-    └── feature%2Fauth/    # slashes in branch names are percent-encoded
+    └── feature_auth/      # slashes in branch names are underscore-escaped
 ```
 
 ### Design decisions
