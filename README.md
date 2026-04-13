@@ -1,4 +1,4 @@
-# wt
+# w(ork)t(rees)
 
 A fast CLI for managing git worktrees. One command to create a branch, set up the worktree, and `cd` into it.
 
