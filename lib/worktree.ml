@@ -228,6 +228,52 @@ let repo_command repo_name =
         Printf.printf "%s\n" (Filename.concat base_dir repo)
       ) (List.sort String.compare repos)
 
+let delete_all_command () =
+  let base_dir = Utils.get_wt_base_dir () in
+  if not (Sys.file_exists base_dir) then begin
+    Printf.printf "No worktrees found.\n";
+    exit 0
+  end;
+
+  let repos = Utils.list_dir base_dir
+    |> List.filter (Utils.is_repo_dir base_dir) in
+  if repos = [] then begin
+    Printf.printf "No worktrees found.\n";
+    exit 0
+  end;
+
+  let entries = List.concat_map (fun repo ->
+    let repo_path = Filename.concat base_dir repo in
+    let branches = Utils.list_dir repo_path in
+    List.filter_map (fun encoded ->
+      let branch_path = Filename.concat repo_path encoded in
+      if Sys.is_directory branch_path then
+        Some (repo, Utils.decode_branch_name encoded, branch_path)
+      else
+        None
+    ) branches
+  ) repos in
+
+  if entries = [] then begin
+    Printf.printf "No worktrees found.\n";
+    exit 0
+  end;
+
+  Printf.printf "This will delete ALL worktrees and their branches:\n\n";
+  List.iter (fun (repo, branch, path) ->
+    Printf.printf "  %s: %s -> %s\n" repo branch path
+  ) entries;
+  Printf.printf "\nAre you sure? [y/N]: %!";
+  let input = try String.trim (input_line stdin) with End_of_file -> "" in
+  if input <> "y" && input <> "Y" then begin
+    Printf.printf "Aborted.\n";
+    exit 0
+  end;
+
+  List.iter (fun (_repo, branch_name, worktree_path) ->
+    delete_worktree_and_branch worktree_path branch_name
+  ) entries
+
 let list_command () =
   let base_dir = Utils.get_wt_base_dir () in
   if not (Sys.file_exists base_dir) then begin

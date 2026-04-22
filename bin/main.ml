@@ -7,6 +7,7 @@ let usage () =
   Printf.printf "  wt d <branch_name>   Delete worktree (keeps branch)\n";
   Printf.printf "  wt db <branch_name>  Delete both worktree and branch\n";
   Printf.printf "  wt repo <name>       Print absolute path of a repo (substring match)\n";
+  Printf.printf "  wt da                Delete all worktrees and branches\n";
   Printf.printf "  wt list              List all worktrees\n";
   Printf.printf "\n";
   Printf.printf "Worktrees are stored in ~/.local/share/wt/<repo>/<branch>\n";
@@ -32,6 +33,7 @@ let () =
       Printf.eprintf "Error: Missing repo name\n";
       Printf.eprintf "Usage: wt repo <name>\n";
       exit 1
+  | ["da"] -> Wt_lib.Worktree.delete_all_command ()
   | ["list"] -> Wt_lib.Worktree.list_command ()
   | ["b"] ->
       Printf.eprintf "Error: Missing branch name\n";
