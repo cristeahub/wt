@@ -3,27 +3,6 @@ let get_worktree_path repo_name branch_name =
   let safe_branch = Utils.safe_branch_name branch_name in
   Filename.concat (Filename.concat base repo_name) safe_branch
 
-let get_context () =
-  let cwd = Sys.getcwd () in
-  let wt_base = Utils.get_wt_base_dir () in
-  if String.length cwd > String.length wt_base &&
-     String.sub cwd 0 (String.length wt_base) = wt_base then
-    let rel_path = String.sub cwd (String.length wt_base + 1)
-      (String.length cwd - String.length wt_base - 1) in
-    match String.split_on_char '/' rel_path with
-    | repo :: branch :: _ -> Some (repo, branch, Filename.concat (Filename.concat wt_base repo) branch)
-    | _ -> None
-  else
-    None
-
-let require_context () =
-  match get_context () with
-  | Some ctx -> ctx
-  | None ->
-      Printf.eprintf "Error: Not inside a wt worktree.\n";
-      Printf.eprintf "Navigate to a worktree first (e.g., wtb <branch>)\n";
-      exit 1
-
 let find_all_existing_worktrees branch_name =
   let base_dir = Utils.get_wt_base_dir () in
   let safe_branch = Utils.safe_branch_name branch_name in
@@ -124,22 +103,6 @@ let branch_command branch_name =
             exit 1
           end)
 
-let extract_repo_branch_from_path worktree_path =
-  let base_dir = Utils.get_wt_base_dir () in
-  let base_len = String.length base_dir in
-  let path_len = String.length worktree_path in
-  if path_len > base_len + 1 &&
-     String.sub worktree_path 0 base_len = base_dir then
-    let relative = String.sub worktree_path (base_len + 1) (path_len - base_len - 1) in
-    match String.index_opt relative '/' with
-    | Some idx ->
-        let repo = String.sub relative 0 idx in
-        let branch = String.sub relative (idx + 1) (String.length relative - idx - 1) in
-        Some (repo, branch)
-    | None -> None
-  else
-    None
-
 let remove_worktree_at_path worktree_path =
   if not (Sys.file_exists worktree_path) then begin
     Printf.printf "No worktree found at: %s\n" worktree_path
@@ -154,11 +117,7 @@ let remove_worktree_at_path worktree_path =
     (match git_dir with
      | Some dir -> ignore (Git.prune_worktrees_using_git_dir dir)
      | None -> ());
-    Printf.printf "Removed worktree at: %s\n" worktree_path;
-    (match extract_repo_branch_from_path worktree_path with
-     | Some (repo, branch) ->
-         ignore (Docker.force_remove_container repo branch)
-     | None -> ())
+    Printf.printf "Removed worktree at: %s\n" worktree_path
   end
 
 let delete_command branch_name =

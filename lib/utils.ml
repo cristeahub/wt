@@ -76,7 +76,7 @@ let list_dir path =
     []
 
 (* Directories in the wt base dir that are internal, not repos *)
-let internal_dirs = ["docker"; "sessions"]
+let internal_dirs = []
 
 let is_repo_dir base_dir name =
   (not (List.mem name internal_dirs)) &&

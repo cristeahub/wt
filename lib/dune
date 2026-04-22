@@ -1,4 +1,4 @@
 (library
  (name wt_lib)
  (libraries unix str)
- (modules utils git worktree docker))
+ (modules utils git worktree))

@@ -24,15 +24,6 @@ chmod +x "$INSTALL_DIR/wt"
 
 echo "Installed wt to $INSTALL_DIR/wt"
 
-# Copy Docker files for Docker support
-DOCKER_DIR="$HOME/.local/share/wt/docker"
-mkdir -p "$DOCKER_DIR"
-if [[ -f "$SCRIPT_DIR/docker/Dockerfile" ]]; then
-    cp "$SCRIPT_DIR/docker/Dockerfile" "$DOCKER_DIR/"
-    cp "$SCRIPT_DIR/docker/entrypoint.sh" "$DOCKER_DIR/"
-    echo "Installed Docker files to $DOCKER_DIR/"
-fi
-
 # Check if ~/.local/bin is in PATH
 if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
     echo ""
@@ -116,17 +107,4 @@ echo "  wt list             List all worktrees"
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo "  wtb <branch>       Create and cd into worktree"
 fi
-echo ""
-echo "Docker commands (run from within a worktree):"
-echo "  wt docker build     Build the base Docker image"
-echo "  wt docker start     Start container for current worktree"
-echo "  wt docker shell     Open shell in container"
-echo "  wt run <cmd>        Run command in container (e.g., wt run claude)"
-echo "  wt login            Configure Claude authentication token"
-echo ""
-echo "First time Docker setup:"
-echo "  1. Run 'wt docker build' to build the image"
-echo "  2. Run 'wt login' to configure Claude authentication"
-echo "  3. Navigate to a worktree with 'wtb <branch>'"
-echo "  4. Run 'wt docker start' to start the container"
-echo "  5. Run 'wt run claude' to use Claude in the container"
+
