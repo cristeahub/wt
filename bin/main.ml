@@ -1,5 +1,3 @@
-(** wt - Git worktree management CLI tool *)
-
 let version = "0.1.0"
 
 let usage () =
@@ -33,122 +31,75 @@ let usage () =
   Printf.printf "  wtb() { local dir=$(wt b \"$1\" | tail -1); [ -d \"$dir\" ] && cd \"$dir\"; }\n";
   exit 0
 
-(* Get current worktree context (repo_name, branch_name, worktree_path) *)
-let get_worktree_context () =
-  let cwd = Sys.getcwd () in
-  let wt_base = Wt_lib.Utils.get_wt_base_dir () in
-  (* Check if we're inside ~/.local/share/wt/<repo>/<branch> *)
-  if String.length cwd > String.length wt_base &&
-     String.sub cwd 0 (String.length wt_base) = wt_base then
-    (* Extract repo and branch from path *)
-    let rel_path = String.sub cwd (String.length wt_base + 1)
-      (String.length cwd - String.length wt_base - 1) in
-    match String.split_on_char '/' rel_path with
-    | repo :: branch :: _ -> Some (repo, branch, Filename.concat (Filename.concat wt_base repo) branch)
-    | _ -> None
-  else
-    None
+type docker_subcmd = Build | Start | Stop | Shell | DockerStatus | DockerRm | DockerList
 
-(* Find the dockerfile directory *)
-let get_dockerfile_dir () =
-  (* Look for Dockerfile in the installed location or current directory *)
-  let home = Sys.getenv "HOME" in
-  let installed_docker_dir = Filename.concat
-    (Filename.concat (Filename.concat home ".local") "share") "wt/docker" in
-  if Sys.file_exists (Filename.concat installed_docker_dir "Dockerfile") then
-    Some installed_docker_dir
-  else
-    (* Try relative to executable *)
-    None
+let parse_docker_subcmd = function
+  | "build" -> Some Build
+  | "start" -> Some Start
+  | "stop" -> Some Stop
+  | "shell" -> Some Shell
+  | "status" -> Some DockerStatus
+  | "rm" -> Some DockerRm
+  | "list" -> Some DockerList
+  | _ -> None
 
 let docker_command subcmd =
   match subcmd with
-  | "build" ->
+  | Build ->
       if not (Wt_lib.Docker.docker_available ()) then begin
         Printf.eprintf "Error: Docker is not available. Make sure Docker is installed and running.\n";
         exit 1
       end;
-      (match get_dockerfile_dir () with
+      (match Wt_lib.Docker.find_dockerfile_dir () with
       | Some dir ->
           if not (Wt_lib.Docker.build_image dir) then exit 1
       | None ->
           Printf.eprintf "Error: Dockerfile not found.\n";
           Printf.eprintf "Run install.sh to set up the Docker image.\n";
           exit 1)
-  | "start" ->
-      (match get_worktree_context () with
-      | Some (repo, branch, path) ->
-          if not (Wt_lib.Docker.image_exists ()) then begin
-            Printf.eprintf "Error: Docker image not found. Run 'wt docker build' first.\n";
-            exit 1
-          end;
-          if not (Wt_lib.Docker.start_container repo branch path) then exit 1
-      | None ->
-          Printf.eprintf "Error: Not inside a wt worktree.\n";
-          Printf.eprintf "Navigate to a worktree first (e.g., wtb <branch>)\n";
-          exit 1)
-  | "stop" ->
-      (match get_worktree_context () with
-      | Some (repo, branch, _) ->
-          if not (Wt_lib.Docker.stop_container repo branch) then exit 1
-      | None ->
-          Printf.eprintf "Error: Not inside a wt worktree.\n";
-          exit 1)
-  | "shell" ->
-      (match get_worktree_context () with
-      | Some (repo, branch, _) ->
-          let code = Wt_lib.Docker.shell_in_container repo branch in
-          exit code
-      | None ->
-          Printf.eprintf "Error: Not inside a wt worktree.\n";
-          exit 1)
-  | "status" ->
-      (match get_worktree_context () with
-      | Some (repo, branch, _) ->
-          Printf.printf "%s\n" (Wt_lib.Docker.status_string repo branch)
-      | None ->
-          Printf.eprintf "Error: Not inside a wt worktree.\n";
-          exit 1)
-  | "rm" ->
-      (match get_worktree_context () with
-      | Some (repo, branch, _) ->
-          if not (Wt_lib.Docker.remove_container repo branch) then exit 1
-      | None ->
-          Printf.eprintf "Error: Not inside a wt worktree.\n";
-          exit 1)
-  | "list" ->
+  | Start ->
+      let (repo, branch, path) = Wt_lib.Worktree.require_context () in
+      if not (Wt_lib.Docker.image_exists ()) then begin
+        Printf.eprintf "Error: Docker image not found. Run 'wt docker build' first.\n";
+        exit 1
+      end;
+      if not (Wt_lib.Docker.start_container repo branch path) then exit 1
+  | Stop ->
+      let (repo, branch, _) = Wt_lib.Worktree.require_context () in
+      if not (Wt_lib.Docker.stop_container repo branch) then exit 1
+  | Shell ->
+      let (repo, branch, _) = Wt_lib.Worktree.require_context () in
+      let code = Wt_lib.Docker.shell_in_container repo branch in
+      exit code
+  | DockerStatus ->
+      let (repo, branch, _) = Wt_lib.Worktree.require_context () in
+      Printf.printf "%s\n" (Wt_lib.Docker.status_string repo branch)
+  | DockerRm ->
+      let (repo, branch, _) = Wt_lib.Worktree.require_context () in
+      if not (Wt_lib.Docker.remove_container repo branch) then exit 1
+  | DockerList ->
       Wt_lib.Docker.list_containers ()
-  | _ ->
-      Printf.eprintf "Error: Unknown docker subcommand '%s'\n" subcmd;
-      Printf.eprintf "Run 'wt --help' for usage\n";
-      exit 1
 
 let run_command args =
-  match get_worktree_context () with
-  | Some (repo, branch, _) ->
-      (* Handle -y and -t shorthands for claude *)
-      let args = match args with
-        | "claude" :: rest ->
-            let has_skip_flag = List.exists (fun a -> a = "-y" || a = "--dangerously-skip-permissions") rest in
-            let has_teams_flag = List.exists (fun a -> a = "-t") rest in
-            let filtered = List.filter (fun a -> a <> "-y" && a <> "-t") rest in
-            let claude_args = if has_skip_flag then "--dangerously-skip-permissions" :: filtered else filtered in
-            let prefix = if has_teams_flag then "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 " else "" in
-            [prefix ^ "claude" ^ (if claude_args = [] then "" else " " ^ String.concat " " claude_args)]
-        | _ -> args
-      in
-      let cmd = String.concat " " args in
-      let code = Wt_lib.Docker.exec_in_container repo branch cmd true in
-      exit code
-  | None ->
-      Printf.eprintf "Error: Not inside a wt worktree.\n";
-      Printf.eprintf "Navigate to a worktree first (e.g., wtb <branch>)\n";
-      exit 1
+  let (repo, branch, _) = Wt_lib.Worktree.require_context () in
+  (* Handle -y and -t shorthands for claude *)
+  let args = match args with
+    | "claude" :: rest ->
+        let has_skip_flag = List.exists (fun a -> a = "-y" || a = "--dangerously-skip-permissions") rest in
+        let has_teams_flag = List.exists (fun a -> a = "-t") rest in
+        let filtered = List.filter (fun a -> a <> "-y" && a <> "-t") rest in
+        let claude_args = if has_skip_flag then "--dangerously-skip-permissions" :: filtered else filtered in
+        let prefix = if has_teams_flag then "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 " else "" in
+        [prefix ^ "claude" ^ (if claude_args = [] then "" else " " ^ String.concat " " claude_args)]
+    | _ -> args
+  in
+  let cmd = String.concat " " args in
+  let code = Wt_lib.Docker.exec_in_container repo branch cmd true in
+  exit code
 
 let login_command () =
   Printf.printf "Claude Code Authentication Setup\n";
   Printf.printf "================================\n\n";
-  (* Try auto-extracting from macOS Keychain first *)
   Printf.printf "Checking macOS Keychain for Claude Code credentials...\n%!";
   match Wt_lib.Docker.try_extract_keychain_token () with
   | Some token ->
@@ -200,7 +151,13 @@ let () =
       Printf.eprintf "Error: Missing branch name\n";
       Printf.eprintf "Usage: wt db <branch_name>\n";
       exit 1
-  | ["docker"; subcmd] -> docker_command subcmd
+  | ["docker"; subcmd] ->
+      (match parse_docker_subcmd subcmd with
+      | Some cmd -> docker_command cmd
+      | None ->
+          Printf.eprintf "Error: Unknown docker subcommand '%s'\n" subcmd;
+          Printf.eprintf "Run 'wt --help' for usage\n";
+          exit 1)
   | ["docker"] ->
       Printf.eprintf "Error: Missing docker subcommand\n";
       Printf.eprintf "Usage: wt docker <build|start|stop|shell|status|rm|list>\n";

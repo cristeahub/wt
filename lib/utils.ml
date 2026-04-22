@@ -1,12 +1,7 @@
-(** Shared utility functions for wt *)
-
-(* Shell-escape a string by wrapping in single quotes and escaping embedded single quotes *)
 let shell_escape s =
   "'" ^ String.concat "'\\''" (String.split_on_char '\'' s) ^ "'"
 
-(* Encode a branch name for safe filesystem use.
-   Uses underscore escaping: '_' -> '__', '/' -> '_'
-   (e.g. branches "feature/auth" and "feature_auth" map to distinct paths). *)
+(* '_' -> '__', '/' -> '_' so "feature/auth" and "feature_auth" map to distinct paths *)
 let safe_branch_name branch_name =
   let buf = Buffer.create (String.length branch_name) in
   String.iter (fun c ->
@@ -87,8 +82,7 @@ let is_repo_dir base_dir name =
   (not (List.mem name internal_dirs)) &&
   Sys.is_directory (Filename.concat base_dir name)
 
-(* Decode an underscore-escaped branch name back to the original.
-   Reverses safe_branch_name: '__' -> '_', single '_' -> '/' *)
+(* Reverses safe_branch_name: '__' -> '_', single '_' -> '/' *)
 let decode_branch_name encoded =
   let len = String.length encoded in
   let buf = Buffer.create len in
