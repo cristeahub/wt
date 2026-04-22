@@ -109,6 +109,33 @@ The installer adds this to `.zshrc` with zsh-specific tab completion. For bash, 
 - Git branches in the current repo
 - Existing worktree branch names from `~/.local/share/wt/`
 
+## Copying Untracked Files (`.wtfiles`)
+
+Projects often have untracked files — `.env`, local configs, secrets — that aren't in git but are needed to work. You can create a `.wtfiles` file in your repo root listing these paths, and `wt` will automatically copy them into every new worktree.
+
+```
+# .wtfiles — one path per line
+.env
+secrets/api_key.json
+config/local.yml
+```
+
+When you run `wt b <branch>` and a new worktree is created, each listed file or directory is copied from the current repo root into the new worktree:
+
+```
+$ wt b feature-x
+Copied .env
+Copied config/local.yml
+Warning: secrets/api_key.json not found, skipping
+Created branch 'feature-x' and worktree at: ~/.local/share/wt/myrepo/feature-x
+```
+
+- Lines starting with `#` are comments
+- Directories are copied recursively
+- Missing files are skipped with a warning
+- Files are independent copies — changes in one worktree won't affect others
+- `.wtfiles` itself can be committed to the repo (it only references untracked paths)
+
 ## Docker Integration
 
 `wt` can run isolated Docker containers per worktree, useful for running development tools in a consistent environment.

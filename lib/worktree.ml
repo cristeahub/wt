@@ -98,6 +98,9 @@ let branch_command branch_name =
           | None ->
               Utils.ensure_dir_exists (Filename.dirname worktree_path);
               if Git.add_worktree worktree_path branch_name then begin
+                (match Git.get_repo_root () with
+                 | Some root -> Utils.copy_wtfiles root worktree_path
+                 | None -> ());
                 Printf.printf "Created worktree at: %s\n" worktree_path;
                 Printf.printf "%s\n" worktree_path
               end else begin
@@ -111,6 +114,9 @@ let branch_command branch_name =
       | (false, false) ->
           Utils.ensure_dir_exists (Filename.dirname worktree_path);
           if Git.add_worktree_new_branch worktree_path branch_name then begin
+            (match Git.get_repo_root () with
+             | Some root -> Utils.copy_wtfiles root worktree_path
+             | None -> ());
             Printf.printf "Created branch '%s' and worktree at: %s\n" branch_name worktree_path;
             Printf.printf "%s\n" worktree_path
           end else begin

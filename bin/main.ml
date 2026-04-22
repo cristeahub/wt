@@ -27,6 +27,10 @@ let usage () =
   Printf.printf "Worktrees are stored in ~/.local/share/wt/<repo>/<branch>\n";
   Printf.printf "Claude sessions are isolated per worktree in ~/.local/share/wt/sessions/\n";
   Printf.printf "\n";
+  Printf.printf "File copying:\n";
+  Printf.printf "  Create a .wtfiles in your repo root listing untracked files to copy\n";
+  Printf.printf "  into new worktrees (one path per line, # comments supported).\n";
+  Printf.printf "\n";
   Printf.printf "Tip: Add this shell function to auto-cd into worktrees:\n";
   Printf.printf "  wtb() { local dir=$(wt b \"$1\" | tail -1); [ -d \"$dir\" ] && cd \"$dir\"; }\n";
   exit 0

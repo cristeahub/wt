@@ -83,6 +83,32 @@ let is_repo_dir base_dir name =
   Sys.is_directory (Filename.concat base_dir name)
 
 (* Reverses safe_branch_name: '__' -> '_', single '_' -> '/' *)
+let copy_path src dst =
+  if Sys.is_directory src then
+    ignore (Sys.command (Printf.sprintf "cp -R %s %s" (shell_escape src) (shell_escape dst)))
+  else begin
+    ensure_dir_exists (Filename.dirname dst);
+    ignore (Sys.command (Printf.sprintf "cp %s %s" (shell_escape src) (shell_escape dst)))
+  end
+
+let copy_wtfiles source_root target_root =
+  let wtfiles_path = Filename.concat source_root ".wtfiles" in
+  match read_file wtfiles_path with
+  | None -> ()
+  | Some contents ->
+      let lines = String.split_on_char '\n' contents in
+      List.iter (fun line ->
+        let line = String.trim line in
+        if line <> "" && (String.length line = 0 || line.[0] <> '#') then
+          let src = Filename.concat source_root line in
+          let dst = Filename.concat target_root line in
+          if Sys.file_exists src then begin
+            copy_path src dst;
+            Printf.eprintf "Copied %s\n" line
+          end else
+            Printf.eprintf "Warning: %s not found, skipping\n" line
+      ) lines
+
 let decode_branch_name encoded =
   let len = String.length encoded in
   let buf = Buffer.create len in
