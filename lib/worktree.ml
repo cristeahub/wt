@@ -288,13 +288,29 @@ let list_command () =
     exit 0
   end;
 
-  List.iter (fun repo ->
+  let repo_entries = List.filter_map (fun repo ->
     let repo_path = Filename.concat base_dir repo in
-    Printf.printf "%s:\n" repo;
     let branches = Utils.list_dir repo_path in
-    List.iter (fun branch ->
+    let entries = List.filter_map (fun branch ->
       let branch_path = Filename.concat repo_path branch in
-      if Sys.is_directory branch_path then
-        Printf.printf "  %s -> %s\n" (Utils.decode_branch_name branch) branch_path
-    ) (List.sort String.compare branches)
-  ) (List.sort String.compare repos)
+      if Sys.is_directory branch_path && Utils.list_dir branch_path <> [] then
+        Some (branch, branch_path)
+      else
+        None
+    ) branches in
+    match entries with
+    | [] -> None
+    | entries -> Some (repo, List.sort (fun (a, _) (b, _) -> String.compare a b) entries)
+  ) repos in
+
+  if repo_entries = [] then begin
+    Printf.printf "No worktrees found.\n";
+    exit 0
+  end;
+
+  List.iter (fun (repo, entries) ->
+    Printf.printf "%s:\n" repo;
+    List.iter (fun (branch, branch_path) ->
+      Printf.printf "  %s -> %s\n" (Utils.decode_branch_name branch) branch_path
+    ) entries
+  ) (List.sort (fun (a, _) (b, _) -> String.compare a b) repo_entries)
