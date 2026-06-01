@@ -96,10 +96,12 @@ let copy_wtfiles source_root target_root =
   match read_file wtfiles_path with
   | None -> ()
   | Some contents ->
+      copy_path wtfiles_path (Filename.concat target_root ".wtfiles");
+      Printf.eprintf "Copied .wtfiles\n";
       let lines = String.split_on_char '\n' contents in
       List.iter (fun line ->
         let line = String.trim line in
-        if line <> "" && (String.length line = 0 || line.[0] <> '#') then
+        if line <> "" && line <> ".wtfiles" && line.[0] <> '#' then
           let src = Filename.concat source_root line in
           let dst = Filename.concat target_root line in
           if Sys.file_exists src then begin
