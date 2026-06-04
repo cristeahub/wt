@@ -39,30 +39,128 @@ ZSHRC="$HOME/.zshrc"
 # Shell function for wtb
 SHELL_FUNCTION='wtb() { local dir=$(wt b "$1" | tail -1); [ -d "$dir" ] && cd "$dir"; }'
 
-# Completion function for wtb - provides tab completion for branch names
-COMPLETION_FUNCTION='_wtb() {
+# Completion functions for wt and wtb
+COMPLETION_FUNCTION='_wt_decode_branch_name() {
+  local encoded="$1"
+  local decoded=""
+  local i=1
+
+  while (( i <= ${#encoded} )); do
+    local ch="${encoded[$i]}"
+    local next="${encoded[$((i + 1))]}"
+    if [[ "$ch" == "_" && "$next" == "_" ]]; then
+      decoded+="_"
+      ((i += 2))
+    elif [[ "$ch" == "_" ]]; then
+      decoded+="/"
+      ((i += 1))
+    else
+      decoded+="$ch"
+      ((i += 1))
+    fi
+  done
+
+  print -r -- "$decoded"
+}
+
+_wt_worktree_branch_names() {
   local branches=()
-  # Add git branches from current repo
-  if git rev-parse --is-inside-work-tree &>/dev/null; then
-    branches+=(${(f)"$(git branch --format='"'"'%(refname:short)'"'"' 2>/dev/null)"})
-  fi
-  # Add branches from existing worktrees
   local wt_base="$HOME/.local/share/wt"
+
   if [[ -d "$wt_base" ]]; then
     for repo_dir in "$wt_base"/*(/N); do
       for branch_dir in "$repo_dir"/*(/N); do
-        branches+=("${branch_dir:t}")
+        branches+=("$(_wt_decode_branch_name "${branch_dir:t}")")
       done
     done
   fi
-  # Remove duplicates
-  branches=(${(u)branches})
-  _describe '"'"'branch'"'"' branches
+
+  print -l -- "${branches[@]}"
 }
+
+_wt_add_matches() {
+  local cur="${words[$CURRENT]}"
+  local matches=()
+  local candidate
+
+  for candidate in "$@"; do
+    if [[ "$candidate" == "$cur"* ]]; then
+      matches+=("$candidate")
+    fi
+  done
+
+  matches=("${(@u)matches}")
+  if (( ${#matches} > 0 )); then
+    compadd -U -Q -- "${matches[@]}"
+  fi
+}
+
+_wt_branch_names() {
+  local branches=()
+
+  # Add git branches from current repo
+  if git rev-parse --is-inside-work-tree &>/dev/null; then
+    branches+=( ${(f)"$(git branch --format="%(refname:short)" 2>/dev/null)"} )
+  fi
+
+  # Add branches from existing worktrees
+  branches+=( $(_wt_worktree_branch_names) )
+
+  _wt_add_matches "${branches[@]}"
+}
+
+_wt_repo_names() {
+  local names=()
+  local wt_base="$HOME/.local/share/wt"
+
+  if [[ -d "$wt_base" ]]; then
+    for repo_dir in "$wt_base"/*(/N); do
+      local repo_name="${repo_dir:t}"
+      if [[ "$repo_name" == *_* ]]; then
+        names+=("${repo_name//_//}")
+      else
+        names+=("$repo_name")
+      fi
+    done
+  fi
+
+  # wt repo accepts either repo names or existing worktree branch names.
+  names+=( $(_wt_worktree_branch_names) )
+
+  _wt_add_matches "${names[@]}"
+}
+
+_wt() {
+  local -a commands
+  commands=(
+    "b:Create branch and worktree, or navigate to existing"
+    "d:Delete worktree, keeping branch"
+    "db:Delete worktree and branch"
+    "repo:Print path of a repo or existing worktree"
+    "da:Delete all worktrees and branches"
+    "list:List all worktrees"
+  )
+
+  if (( CURRENT == 2 )); then
+    _describe "command" commands
+    return
+  fi
+
+  case "${words[2]}" in
+    b|d|db) _wt_branch_names ;;
+    repo) _wt_repo_names ;;
+  esac
+}
+
+_wtb() {
+  _wt_branch_names
+}
+
+compdef _wt wt
 compdef _wtb wtb'
 
 echo ""
-read -p "Would you like to add the 'wtb' shell function to ~/.zshrc for auto-cd? [y/N] " -n 1 -r
+read -p "Would you like to add shell integration to ~/.zshrc (wtb auto-cd + tab completion)? [y/N] " -n 1 -r
 echo ""
 
 if [[ $REPLY =~ ^[Yy]$ ]]; then
@@ -79,16 +177,21 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
         ADDED_SOMETHING=true
     fi
 
-    # Check if completion function already exists
-    if grep -q "_wtb()" "$ZSHRC" 2>/dev/null; then
-        echo "The wtb completion already exists in $ZSHRC"
-    else
-        echo "" >> "$ZSHRC"
-        echo "# Tab completion for wtb" >> "$ZSHRC"
-        echo "$COMPLETION_FUNCTION" >> "$ZSHRC"
-        echo "Added wtb tab completion to $ZSHRC"
-        ADDED_SOMETHING=true
+    # Always append the latest completion block. If an older _wt() exists earlier
+    # in .zshrc, this later definition overrides it when the file is sourced.
+    HAD_COMPLETION=false
+    if grep -q "_wt()" "$ZSHRC" 2>/dev/null; then
+        HAD_COMPLETION=true
     fi
+    echo "" >> "$ZSHRC"
+    echo "# Tab completion for wt and wtb" >> "$ZSHRC"
+    echo "$COMPLETION_FUNCTION" >> "$ZSHRC"
+    if $HAD_COMPLETION; then
+        echo "Updated wt and wtb tab completion in $ZSHRC"
+    else
+        echo "Added wt and wtb tab completion to $ZSHRC"
+    fi
+    ADDED_SOMETHING=true
 
     if $ADDED_SOMETHING; then
         echo "Run 'source ~/.zshrc' or restart your shell to use it."
@@ -102,7 +205,7 @@ echo "Usage:"
 echo "  wt b <branch>       Create/navigate to branch worktree"
 echo "  wt d <branch>       Delete worktree (keeps branch)"
 echo "  wt db <branch>      Delete both worktree and branch"
-echo "  wt repo <name>      Print absolute path of a repo"
+echo "  wt repo <name>      Print path of a repo or existing worktree"
 echo "  wt list             List all worktrees"
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo "  wtb <branch>       Create and cd into worktree"

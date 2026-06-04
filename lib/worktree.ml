@@ -201,32 +201,72 @@ let delete_both_command branch_name =
         exit 1
       end
 
-let repo_command repo_name =
+let contains_case_insensitive needle haystack =
+  try
+    let _ = Str.search_forward (Str.regexp_string_case_fold needle) haystack 0 in
+    true
+  with Not_found -> false
+
+let repo_name_matches name repo =
+  if String.contains name '_' then
+    false
+  else
+    let stored_name = String.map (fun c -> if c = '/' then '_' else c) name in
+    if stored_name = repo then true
+    else contains_case_insensitive stored_name repo
+
+let repo_command name =
   let base_dir = Utils.get_wt_base_dir () in
   if not (Sys.file_exists base_dir) then begin
-    Printf.eprintf "No repo '%s' found.\n" repo_name;
+    Printf.eprintf "No repo or worktree '%s' found.\n" name;
     exit 1
   end;
+
   let repos = Utils.list_dir base_dir
     |> List.filter (Utils.is_repo_dir base_dir) in
-  let matches =
-    let exact = List.filter (fun r -> r = repo_name) repos in
+
+  let repo_matches =
+    let exact_name = String.map (fun c -> if c = '/' then '_' else c) name in
+    let exact =
+      if String.contains name '_' then []
+      else List.filter (fun r -> r = exact_name) repos
+    in
     if exact <> [] then exact
-    else List.filter (fun r ->
-      try
-        let _ = Str.search_forward (Str.regexp_string_case_fold repo_name) r 0 in
-        true
-      with Not_found -> false
-    ) repos
+    else List.filter (repo_name_matches name) repos
   in
-  match matches with
-  | [] ->
-      Printf.eprintf "No repo '%s' found.\n" repo_name;
-      exit 1
-  | repos ->
+
+  match repo_matches with
+  | _ :: _ ->
       List.iter (fun repo ->
         Printf.printf "%s\n" (Filename.concat base_dir repo)
-      ) (List.sort String.compare repos)
+      ) (List.sort String.compare repo_matches)
+  | [] ->
+      let worktree_entries = List.concat_map (fun repo ->
+        let repo_path = Filename.concat base_dir repo in
+        Utils.list_dir repo_path
+        |> List.filter_map (fun encoded_branch ->
+          let branch_path = Filename.concat repo_path encoded_branch in
+          if Sys.is_directory branch_path then
+            Some (repo, Utils.decode_branch_name encoded_branch, branch_path)
+          else
+            None)
+      ) repos in
+      let worktree_matches =
+        let exact = List.filter (fun (_, branch, _) -> branch = name) worktree_entries in
+        if exact <> [] then exact
+        else List.filter (fun (_, branch, _) -> contains_case_insensitive name branch) worktree_entries
+      in
+      match worktree_matches with
+      | [] ->
+          Printf.eprintf "No repo or worktree '%s' found.\n" name;
+          exit 1
+      | matches ->
+          matches
+          |> List.sort (fun (repo_a, branch_a, _) (repo_b, branch_b, _) ->
+            match String.compare repo_a repo_b with
+            | 0 -> String.compare branch_a branch_b
+            | n -> n)
+          |> List.iter (fun (_, _, path) -> Printf.printf "%s\n" path)
 
 let delete_all_command () =
   let base_dir = Utils.get_wt_base_dir () in

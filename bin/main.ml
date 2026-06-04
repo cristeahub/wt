@@ -6,7 +6,7 @@ let usage () =
   Printf.printf "  wt b <branch_name>   Create branch and worktree, or navigate to existing\n";
   Printf.printf "  wt d <branch_name>   Delete worktree (keeps branch)\n";
   Printf.printf "  wt db <branch_name>  Delete both worktree and branch\n";
-  Printf.printf "  wt repo <name>       Print absolute path of a repo (substring match)\n";
+  Printf.printf "  wt repo <name>       Print path of a repo or existing worktree (substring match)\n";
   Printf.printf "  wt da                Delete all worktrees and branches\n";
   Printf.printf "  wt list              List all worktrees\n";
   Printf.printf "\n";

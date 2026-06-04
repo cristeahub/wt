@@ -94,6 +94,21 @@ other-repo:
   main         -> /home/you/.local/share/wt/other-repo/main
 ```
 
+### Print a repo or worktree path
+
+```bash
+wt repo myrepo        # repo directory
+wt repo cto/fix-image # repo directory stored as cto_fix-image
+wt repo cto/new-arch  # existing worktree directory
+```
+
+Prints matching paths. Repo names are matched first (`/` maps to `_` in stored repo directory names); if none match, existing worktree branch names are matched exactly first, then as a case-insensitive substring:
+
+```
+/home/you/.local/share/wt/myrepo
+/home/you/.local/share/wt/apps/cto_new-arch
+```
+
 ## Shell Integration
 
 The `wtb` function wraps `wt b` and cd's into the result:
@@ -102,10 +117,11 @@ The `wtb` function wraps `wt b` and cd's into the result:
 wtb() { local dir=$(wt b "$1" | tail -1); [ -d "$dir" ] && cd "$dir"; }
 ```
 
-The installer adds this to `.zshrc` with zsh-specific tab completion. For bash, add the function to `.bashrc` manually. Tab completion autocompletes from:
+The installer adds this to `.zshrc` with zsh-specific tab completion. For bash, add the function to `.bashrc` manually. Tab completion autocompletes:
 
-- Git branches in the current repo
-- Existing worktree branch names from `~/.local/share/wt/`
+- `wt` subcommands
+- Branch names for `wt b`, `wt d`, `wt db`, and `wtb`
+- Repo names and existing worktree branch names from `~/.local/share/wt/` for `wt repo`
 
 ## Copying Untracked Files (`.wtfiles`)
 
