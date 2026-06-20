@@ -103,22 +103,57 @@ let branch_command branch_name =
             exit 1
           end)
 
-let remove_worktree_at_path worktree_path =
+let resolve_git_dir git_dir worktree_path =
+  match git_dir with
+  | Some _ -> git_dir
+  | None -> Git.get_git_common_dir_from_path worktree_path
+
+let path_is_at_or_under parent path =
+  let parent_len = String.length parent in
+  path = parent ||
+  (String.length path > parent_len &&
+   String.sub path 0 parent_len = parent &&
+   path.[parent_len] = '/')
+
+let remove_worktree_at_path ?git_dir worktree_path =
   if not (Sys.file_exists worktree_path) then begin
     Printf.printf "No worktree found at: %s\n" worktree_path
   end else begin
-    let git_dir = Git.get_git_common_dir_from_path worktree_path in
-    let cmd = Printf.sprintf "rm -rf %s" (Utils.shell_escape worktree_path) in
-    let exit_code = Sys.command cmd in
-    if exit_code <> 0 then begin
-      Printf.eprintf "Error: Failed to remove worktree at %s\n" worktree_path;
-      exit 1
+    let git_dir = resolve_git_dir git_dir worktree_path in
+    let removed_by_git =
+      match git_dir with
+      | Some dir -> Git.remove_worktree_using_git_dir dir worktree_path
+      | None -> false
+    in
+    if (not removed_by_git) && Sys.file_exists worktree_path then begin
+      let cmd = Printf.sprintf "rm -rf %s" (Utils.shell_escape worktree_path) in
+      let exit_code = Sys.command cmd in
+      if exit_code <> 0 then begin
+        Printf.eprintf "Error: Failed to remove worktree at %s\n" worktree_path;
+        exit 1
+      end;
+      (match git_dir with
+       | Some dir -> ignore (Git.prune_worktrees_using_git_dir dir)
+       | None -> ())
     end;
-    (match git_dir with
-     | Some dir -> ignore (Git.prune_worktrees_using_git_dir dir)
-     | None -> ());
     Printf.printf "Removed worktree at: %s\n" worktree_path
   end
+
+let delete_branch_using_git_dir_and_report git_dir branch_name =
+  if Git.delete_branch_using_git_dir git_dir branch_name then
+    Printf.printf "Deleted branch: %s\n" branch_name
+  else if Git.branch_exists_using_git_dir git_dir branch_name then
+    Printf.eprintf "Warning: Failed to delete branch '%s'\n" branch_name
+  else
+    Printf.printf "Branch '%s' does not exist\n" branch_name
+
+let delete_branch_and_report branch_name =
+  if Git.delete_branch branch_name then
+    Printf.printf "Deleted branch: %s\n" branch_name
+  else if Git.branch_exists branch_name then
+    Printf.eprintf "Warning: Failed to delete branch '%s'\n" branch_name
+  else
+    Printf.printf "Branch '%s' does not exist\n" branch_name
 
 let delete_command branch_name =
   match resolve_worktree_path branch_name with
@@ -139,30 +174,21 @@ let delete_command branch_name =
         exit 1
       end
 
-let delete_worktree_and_branch worktree_path branch_name =
-  let git_dir = Git.get_git_common_dir_from_path worktree_path in
-  let branch_exists = Git.branch_exists_from_path worktree_path branch_name in
+let delete_worktree_and_branch ?git_dir worktree_path branch_name =
+  let git_dir = resolve_git_dir git_dir worktree_path in
 
   let cwd = Sys.getcwd () in
-  if String.length cwd >= String.length worktree_path &&
-     String.sub cwd 0 (String.length worktree_path) = worktree_path then begin
+  if path_is_at_or_under worktree_path cwd then begin
     Printf.eprintf "Error: Cannot delete worktree while inside it. Please cd elsewhere first.\n";
     exit 1
   end;
 
-  remove_worktree_at_path worktree_path;
+  remove_worktree_at_path ?git_dir worktree_path;
 
-  if branch_exists then begin
-    match git_dir with
-    | Some dir ->
-        if Git.delete_branch_using_git_dir dir branch_name then
-          Printf.printf "Deleted branch: %s\n" branch_name
-        else
-          Printf.eprintf "Warning: Failed to delete branch '%s'\n" branch_name
-    | None ->
-        Printf.eprintf "Warning: Could not delete branch '%s' (git dir not found)\n" branch_name
-  end else
-    Printf.printf "Branch '%s' does not exist\n" branch_name
+  match git_dir with
+  | Some dir -> delete_branch_using_git_dir_and_report dir branch_name
+  | None ->
+      Printf.eprintf "Warning: Could not delete branch '%s' (git dir not found)\n" branch_name
 
 let delete_both_command branch_name =
   match resolve_worktree_path branch_name with
@@ -178,7 +204,6 @@ let delete_both_command branch_name =
         in
 
         let worktree_path = get_worktree_path repo_name branch_name in
-        let branch_exists = Git.branch_exists branch_name in
 
         let current_branch = Git.get_current_branch () in
         if current_branch = branch_name then begin
@@ -187,15 +212,7 @@ let delete_both_command branch_name =
         end;
 
         remove_worktree_at_path worktree_path;
-
-        if branch_exists then begin
-          if Git.delete_branch branch_name then
-            Printf.printf "Deleted branch: %s\n" branch_name
-          else begin
-            Printf.eprintf "Warning: Failed to delete branch '%s'\n" branch_name
-          end
-        end else
-          Printf.printf "Branch '%s' does not exist\n" branch_name
+        delete_branch_and_report branch_name
       end else begin
         Printf.eprintf "Error: No worktree found for branch '%s'\n" branch_name;
         exit 1
@@ -268,6 +285,26 @@ let repo_command name =
             | n -> n)
           |> List.iter (fun (_, _, path) -> Printf.printf "%s\n" path)
 
+let group_entries_by_repo entries =
+  let sorted =
+    List.sort (fun (repo_a, _, _) (repo_b, _, _) -> String.compare repo_a repo_b) entries
+  in
+  let rec aux current_repo current_entries groups = function
+    | [] ->
+        (match current_repo with
+         | None -> List.rev groups
+         | Some repo -> List.rev ((repo, List.rev current_entries) :: groups))
+    | ((repo, _, _) as entry) :: rest ->
+        (match current_repo with
+         | Some current when current = repo ->
+             aux current_repo (entry :: current_entries) groups rest
+         | Some current ->
+             aux (Some repo) [entry] ((current, List.rev current_entries) :: groups) rest
+         | None ->
+             aux (Some repo) [entry] groups rest)
+  in
+  aux None [] [] sorted
+
 let delete_all_command () =
   let base_dir = Utils.get_wt_base_dir () in
   if not (Sys.file_exists base_dir) then begin
@@ -310,9 +347,17 @@ let delete_all_command () =
     exit 0
   end;
 
-  List.iter (fun (_repo, branch_name, worktree_path) ->
-    delete_worktree_and_branch worktree_path branch_name
-  ) entries
+  group_entries_by_repo entries
+  |> List.iter (fun (_repo, repo_entries) ->
+    let git_dir =
+      List.find_map (fun (_, _, worktree_path) ->
+        Git.get_git_common_dir_from_path worktree_path
+      ) repo_entries
+    in
+    List.iter (fun (_, branch_name, worktree_path) ->
+      delete_worktree_and_branch ?git_dir worktree_path branch_name
+    ) repo_entries
+  )
 
 let list_command () =
   let base_dir = Utils.get_wt_base_dir () in

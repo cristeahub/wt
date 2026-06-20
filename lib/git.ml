@@ -21,8 +21,8 @@ let delete_branch branch_name =
 let get_current_branch () =
   Utils.run_command_output "git branch --show-current"
 
-let branch_exists_from_path path branch_name =
-  Utils.run_command_status (Printf.sprintf "git -C %s show-ref --verify --quiet refs/heads/%s" (Utils.shell_escape path) (Utils.shell_escape branch_name))
+let branch_exists_using_git_dir git_dir branch_name =
+  Utils.run_command_status (Printf.sprintf "git --git-dir=%s show-ref --verify --quiet refs/heads/%s" (Utils.shell_escape git_dir) (Utils.shell_escape branch_name))
 
 (* Use --absolute-git-dir to get an absolute path that works after worktree removal *)
 let get_git_common_dir_from_path path =
@@ -43,6 +43,9 @@ let get_git_common_dir_from_path path =
 
 let delete_branch_using_git_dir git_dir branch_name =
   Utils.run_command_status (Printf.sprintf "git --git-dir=%s branch -D %s" (Utils.shell_escape git_dir) (Utils.shell_escape branch_name))
+
+let remove_worktree_using_git_dir git_dir path =
+  Utils.run_command_status (Printf.sprintf "git --git-dir=%s worktree remove --force --force %s" (Utils.shell_escape git_dir) (Utils.shell_escape path))
 
 let add_worktree path branch_name =
   Utils.run_command_status (Printf.sprintf "git worktree add %s %s 2>/dev/null" (Utils.shell_escape path) (Utils.shell_escape branch_name))
