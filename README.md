@@ -6,7 +6,7 @@ A fast CLI for managing git worktrees. One command to create a branch, set up th
 wtb feature-x   # creates branch + worktree and cd's into it
 ```
 
-Git worktrees let you work on multiple branches simultaneously without stashing or cloning, but the built-in commands are verbose. `wt` stores all worktrees in `~/.local/share/wt/<repo>/<branch>` and lets you jump between them from anywhere. It also includes optional Docker integration to spin up isolated containers per worktree, with built-in support for running [Claude Code](https://claude.ai/code) inside them.
+Git worktrees let you work on multiple branches simultaneously without stashing or cloning, but the built-in commands are verbose. `wt` stores all worktrees in `~/.local/share/wt/<repo>/<branch>` and lets you jump between them from anywhere.
 
 ## Quick Start
 
