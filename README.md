@@ -12,21 +12,19 @@ Git worktrees let you work on multiple branches simultaneously without stashing 
 
 ### Prerequisites
 
-- **OCaml >= 4.14** and **opam** (OCaml package manager)
+- **OCaml >= 4.14**
+- **Dune >= 3.0**
 - **Git**
 
-If you don't have OCaml installed:
+Install the compiler and build tool directly with your system package manager:
 
 ```bash
 # macOS
-brew install opam
-opam init
-eval $(opam env)
+brew install ocaml dune
 
 # Ubuntu/Debian
-sudo apt install opam
-opam init
-eval $(opam env)
+sudo apt update
+sudo apt install ocaml-nox ocaml-dune
 ```
 
 ### Install
@@ -34,7 +32,6 @@ eval $(opam env)
 ```bash
 git clone https://github.com/cristeahub/wt.git
 cd wt
-opam install . --deps-only
 ./install.sh
 ```
 
@@ -172,7 +169,6 @@ No external OCaml dependencies beyond the standard library.
 ## Building from source
 
 ```bash
-opam install . --deps-only   # install OCaml dependencies
 dune build                   # compile
 dune exec wt -- --help       # run without installing
 ./install.sh                 # build + install to ~/.local/bin/wt

@@ -8,17 +8,14 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up OCaml
-        uses: ocaml/setup-ocaml@v3
-        with:
-          ocaml-compiler: '5.2'
-
-      - name: Install dependencies
-        run: opam install . --deps-only --yes
+      - name: Install OCaml and Dune
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes ocaml-nox ocaml-dune
 
       - name: Build
-        run: opam exec -- dune build
+        run: dune build

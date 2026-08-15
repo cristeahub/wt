@@ -2,8 +2,6 @@
 (name wt)
 (version 0.1.0)
 
-(generate_opam_files true)
-
 (maintainers "Christoffer Tønnessen <christoffer@cto.gg>")
 (authors "Christoffer Tønnessen <christoffer@cto.gg>")
 (homepage "https://github.com/cristeahub/wt")
@@ -14,7 +12,4 @@
 (package
  (name wt)
  (synopsis "Git worktree management CLI tool")
- (description "A CLI tool for managing git worktrees and branches")
- (depends
-  (ocaml (>= 5.1.0))
-  dune))
+ (description "A CLI tool for managing git worktrees and branches"))
